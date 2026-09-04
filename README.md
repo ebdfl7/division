@@ -2,7 +2,7 @@
 
 A simple, offline-friendly web app for practicing division facts (1–12). Students pick a divisor or group, answer on a keypad or by **voice**, and track progress per set.
 
-Open [`division-flashcards.html`](./division-flashcards.html) in a modern browser—no build step or server required (see [Voice input](#voice-input) for mic notes).
+Open [`index.html`](./index.html) in a modern browser—no build step or server required (see [Voice input](#voice-input) for mic notes).
 
 ## Features
 
@@ -17,7 +17,7 @@ Open [`division-flashcards.html`](./division-flashcards.html) in a modern browse
 
 ## How to use
 
-1. Open `division-flashcards.html` in Chrome, Edge, or Safari.
+1. Open `index.html` in Chrome, Edge, or Safari.
 2. Choose a blue set button (÷3, 2–5, All, etc.).
 3. Solve each card with the keypad, keyboard, or mic.
 4. Buttons turn **green** when that set reaches **100%** correct over time.
@@ -65,4 +65,4 @@ python3 -m http.server 8080
 
 ## License
 
-Use and adapt freely for classroom or personal study.
+TBD
