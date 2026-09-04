@@ -447,37 +447,53 @@
       ? (window.SpeechRecognition || window.webkitSpeechRecognition)
       : null;
 
+    // Each practice target has its own stats — individuals and groups never share.
+    // Keys: 1..12, '2-5', '6-8', '9-12', 'all'
+    const GROUP_KEYS = ['2-5', '6-8', '9-12', 'all'];
+
     function emptyProgress() {
       const p = {};
       for (let i = 1; i <= 12; i++) p[i] = { correct: 0, total: 0 };
+      GROUP_KEYS.forEach(k => { p[k] = { correct: 0, total: 0 }; });
       return p;
     }
 
     function loadProgress() {
       try {
-        const raw = localStorage.getItem('divFlashProgress');
+        // v2 = separate tracking for individuals vs groups
+        const raw = localStorage.getItem('divFlashProgressV2');
         if (!raw) return emptyProgress();
         const parsed = JSON.parse(raw);
         const p = emptyProgress();
-        for (let i = 1; i <= 12; i++) {
-          if (parsed[i] && typeof parsed[i].correct === 'number' && typeof parsed[i].total === 'number') {
-            p[i] = { correct: parsed[i].correct, total: parsed[i].total };
+        const keys = [...Array.from({ length: 12 }, (_, i) => i + 1), ...GROUP_KEYS];
+        keys.forEach(k => {
+          if (parsed[k] && typeof parsed[k].correct === 'number' && typeof parsed[k].total === 'number') {
+            p[k] = { correct: parsed[k].correct, total: parsed[k].total };
           }
-        }
+        });
         return p;
       } catch (e) {
         return emptyProgress();
       }
     }
 
+    function labelToProgressKey(label) {
+      if (label === 'All (1-12)' || label === 'all') return 'all';
+      if (label === '2-5' || label === '6-8' || label === '9-12') return label;
+      // ÷3, ÷3 (demo), etc.
+      const m = String(label).match(/÷?\s*(\d+)/);
+      if (m) return parseInt(m[1], 10);
+      return null;
+    }
+
     function App() {
-      // progress[divisor] = { correct, total } per divisor (1-12)
+      // progress[key] = { correct, total } — key is 1-12 or a group id
       const [progress, setProgress] = useState(loadProgress);
 
       // Persist progress whenever it changes
       useEffect(() => {
         try {
-          localStorage.setItem('divFlashProgress', JSON.stringify(progress));
+          localStorage.setItem('divFlashProgressV2', JSON.stringify(progress));
         } catch (e) { /* ignore quota / private mode */ }
       }, [progress]);
 
@@ -492,6 +508,7 @@
       const [sessionCorrect, setSessionCorrect] = useState(0);
       const [sessionTotal, setSessionTotal] = useState(0);
       const [activeLabel, setActiveLabel] = useState('');
+      const [activeProgressKey, setActiveProgressKey] = useState(null); // 1-12 | '2-5' | ...
       const [locked, setLocked] = useState(false);
       const [listening, setListening] = useState(false);
       const [micHint, setMicHint] = useState('');
@@ -526,6 +543,7 @@
           setDeck(d);
           setIndex(0);
           setActiveLabel('÷3 (demo)');
+          setActiveProgressKey(3);
           setMode('practice');
         }
       }, []);
@@ -535,16 +553,9 @@
         return Math.round((obj.correct / obj.total) * 100);
       };
 
+      // Each button reads only its own stored stats (never derived from others)
       const individualPct = (n) => calcPct(progress[n]);
-
-      const groupPct = (nums) => {
-        let c = 0, t = 0;
-        nums.forEach(n => {
-          c += progress[n].correct;
-          t += progress[n].total;
-        });
-        return t === 0 ? 0 : Math.round((c / t) * 100);
-      };
+      const groupPct = (key) => calcPct(progress[key]);
 
       const startPractice = (divisors, label) => {
         if (recognitionRef.current) {
@@ -562,6 +573,7 @@
         setSessionCorrect(0);
         setSessionTotal(0);
         setActiveLabel(label);
+        setActiveProgressKey(labelToProgressKey(label));
         setLocked(false);
         setMode('practice');
       };
@@ -573,7 +585,8 @@
         setProgress(p);
         try {
           localStorage.removeItem('divFlashProgress');
-          localStorage.setItem('divFlashProgress', JSON.stringify(p));
+          localStorage.removeItem('divFlashProgressV2');
+          localStorage.setItem('divFlashProgressV2', JSON.stringify(p));
         } catch (e) { /* ignore */ }
         setResetFlash(true);
         setTimeout(() => setResetFlash(false), 1500);
@@ -596,16 +609,22 @@
         const num = parseInt(input, 10);
         const isCorrect = num === current.answer;
         setFeedback(isCorrect ? 'correct' : 'wrong');
-        setSessionTotal(t => t + 1);
-        if (isCorrect) setSessionCorrect(c => c + 1);
 
-        // Update progress for the divisor being practiced (the 'b' side)
+        // Running session score for this set
+        const newSessionCorrect = sessionCorrect + (isCorrect ? 1 : 0);
+        const newSessionTotal = sessionTotal + 1;
+        setSessionCorrect(newSessionCorrect);
+        setSessionTotal(newSessionTotal);
+
+        // % = questions correct / questions in this set (deck size), for this run only
+        // Individuals and groups stay independent via activeProgressKey
         setProgress(prev => {
+          const key = activeProgressKey;
+          if (key == null || !prev[key]) return prev;
           const next = { ...prev };
-          const d = current.b;
-          next[d] = {
-            correct: prev[d].correct + (isCorrect ? 1 : 0),
-            total: prev[d].total + 1,
+          next[key] = {
+            correct: newSessionCorrect,
+            total: deck.length, // always the full set size, not cumulative attempts
           };
           return next;
         });
@@ -620,7 +639,7 @@
             setIndex(i => i + 1);
           }
         }, isCorrect ? 600 : 1100);
-      }, [current, input, locked, index, deck.length]);
+      }, [current, input, locked, index, deck.length, activeProgressKey, sessionCorrect, sessionTotal]);
 
       const handleDigit = (d) => {
         if (locked) return;
@@ -858,25 +877,25 @@
               <ProgressButton
                 className="group-btn"
                 label="2–5"
-                pct={groupPct([2,3,4,5])}
+                pct={groupPct('2-5')}
                 onClick={() => startPractice([2,3,4,5], '2-5')}
               />
               <ProgressButton
                 className="group-btn"
                 label="6–8"
-                pct={groupPct([6,7,8])}
+                pct={groupPct('6-8')}
                 onClick={() => startPractice([6,7,8], '6-8')}
               />
               <ProgressButton
                 className="group-btn"
                 label="9–12"
-                pct={groupPct([9,10,11,12])}
+                pct={groupPct('9-12')}
                 onClick={() => startPractice([9,10,11,12], '9-12')}
               />
               <ProgressButton
                 className="group-btn"
                 label="All"
-                pct={groupPct([1,2,3,4,5,6,7,8,9,10,11,12])}
+                pct={groupPct('all')}
                 onClick={() => startPractice([1,2,3,4,5,6,7,8,9,10,11,12], 'All (1-12)')}
               />
             </div>
@@ -913,7 +932,7 @@
           </div>
 
           <div className="section" style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>
-            Progress is tracked per divisor as you answer. Select any colored button above to start practicing that set.
+            Each button tracks its own progress separately (individuals do not affect groups, and groups do not affect individuals).
             <br />All problems have whole-number answers (no remainders).
             <br />During practice, tap the 🎤 mic and say the answer (Chrome, Edge, Safari).
           </div>
