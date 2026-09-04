@@ -1,1 +1,927 @@
-y
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Division Flash Cards</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --correct: #22c55e;
+      --wrong: #ef4444;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 16px;
+    }
+    #root { width: 100%; max-width: 720px; }
+    h1 {
+      text-align: center;
+      font-size: 1.75rem;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+    .subtitle {
+      text-align: center;
+      color: var(--muted);
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+    }
+    .section {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+    }
+    .section-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .progress-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+      gap: 10px;
+    }
+    .progress-btn {
+      position: relative;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 8px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 1rem;
+      color: white;
+      transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      min-height: 64px;
+    }
+    .progress-btn:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.1);
+    }
+    .progress-btn:active { transform: translateY(0); }
+    .progress-btn.active {
+      box-shadow: 0 0 0 3px white, 0 0 0 6px currentColor;
+    }
+    .pct-box {
+      position: relative;
+      width: 100%;
+      border-radius: 6px;
+      background: rgba(0,0,0,0.35);
+      overflow: hidden;
+      min-height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pct-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      background: rgba(255,255,255,0.22);
+      border-radius: 6px;
+      transition: width 0.3s ease;
+      pointer-events: none;
+    }
+    .pct {
+      position: relative;
+      z-index: 1;
+      font-size: 0.7rem;
+      opacity: 0.95;
+      font-weight: 600;
+      padding: 2px 0;
+    }
+    .group-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .group-btn {
+      flex: 1;
+      min-width: 100px;
+    }
+    .options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+    .check-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      user-select: none;
+    }
+    .check-label input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    /* Flash card view */
+    .card-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .card {
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      border: 2px solid var(--border);
+      border-radius: 24px;
+      width: 100%;
+      max-width: 360px;
+      min-height: 200px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+      position: relative;
+    }
+    .problem {
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+    .answer-display {
+      font-size: 2.2rem;
+      font-weight: 600;
+      min-height: 48px;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+    }
+    .answer-display.correct { color: var(--correct); }
+    .answer-display.wrong { color: var(--wrong); }
+    .feedback {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+    .feedback.ok { background: rgba(34,197,94,0.2); color: var(--correct); }
+    .feedback.bad { background: rgba(239,68,68,0.2); color: var(--wrong); }
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 360px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      width: 100%;
+      max-width: 280px;
+    }
+    .key {
+      border: none;
+      border-radius: 14px;
+      background: #334155;
+      color: white;
+      font-size: 1.4rem;
+      font-weight: 600;
+      padding: 16px 0;
+      cursor: pointer;
+      transition: background 0.12s, transform 0.1s;
+    }
+    .key:hover { background: #475569; }
+    .key:active { transform: scale(0.96); }
+    .key.enter {
+      background: var(--accent);
+      color: #0f172a;
+    }
+    .key.enter:hover { filter: brightness(1.1); }
+    .key.del {
+      background: #64748b;
+    }
+    .key.del:hover { background: #94a3b8; color: #0f172a; }
+    .mic-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      max-width: 280px;
+    }
+    .mic-btn {
+      border: none;
+      border-radius: 50%;
+      width: 64px;
+      height: 64px;
+      font-size: 1.6rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #334155;
+      color: white;
+      transition: background 0.15s, transform 0.1s, box-shadow 0.2s;
+      position: relative;
+    }
+    .mic-btn:hover:not(:disabled) { background: #475569; }
+    .mic-btn:active:not(:disabled) { transform: scale(0.95); }
+    .mic-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .mic-btn.listening {
+      background: #ef4444;
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+      animation: pulse-mic 1.4s ease-out infinite;
+    }
+    .mic-btn.listening:hover { background: #dc2626; }
+    @keyframes pulse-mic {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); }
+      70% { box-shadow: 0 0 0 16px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    .mic-hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: center;
+      min-height: 1.2em;
+    }
+    .mic-hint.listening { color: #fca5a5; }
+    .mic-hint.error { color: #f87171; }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 20px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.1s;
+    }
+    .btn:hover { filter: brightness(1.1); }
+    .btn:active { transform: scale(0.97); }
+    .btn-secondary {
+      background: #334155;
+      color: white;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #0f172a;
+    }
+    .btn-danger {
+      background: #7f1d1d;
+      color: #fecaca;
+    }
+    .stats {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .stats strong { color: var(--text); }
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 40px 20px;
+    }
+    .results {
+      text-align: center;
+      padding: 24px;
+    }
+    .results h2 { margin-bottom: 12px; }
+    .results p { color: var(--muted); margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useMemo } = React;
+
+    // Button colors: soft blue (lighter than dark bg), green when completed (100%)
+    const BTN_BLUE = '#3b82f6';   // blue-500 — lighter than #0f172a background
+    const BTN_GREEN = '#22c55e';  // green-500 — completed
+
+    function getProgressColor(pct) {
+      if (pct >= 100) return BTN_GREEN;
+      if (pct >= 90) return '#22c55e';
+      if (pct >= 70) return '#84cc16';
+      if (pct >= 50) return '#eab308';
+      if (pct >= 30) return '#f97316';
+      return '#ef4444';
+    }
+
+    function buttonColor(pct) {
+      return pct >= 100 ? BTN_GREEN : BTN_BLUE;
+    }
+
+    // Build division deck: for each divisor d, create (d*1)/d through (d*12)/d
+    // so answers are always whole numbers 1–12
+    function buildDeck(divisors, doubleCards, randomize) {
+      let cards = [];
+      divisors.forEach(d => {
+        for (let n = 1; n <= 12; n++) {
+          const dividend = d * n;
+          cards.push({ a: dividend, b: d, answer: n });
+        }
+      });
+      if (doubleCards) {
+        cards = [...cards, ...cards];
+      }
+      if (randomize) {
+        for (let i = cards.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [cards[i], cards[j]] = [cards[j], cards[i]];
+        }
+      }
+      return cards;
+    }
+
+    function ProgressButton({ label, pct, active, onClick, className = '' }) {
+      const color = buttonColor(pct);
+      return (
+        <button
+          className={`progress-btn ${className} ${active ? 'active' : ''}`}
+          style={{ background: color, color: 'white' }}
+          onClick={onClick}
+        >
+          <span>{label}</span>
+          <div className="pct-box">
+            <div className="pct-fill" style={{ width: `${pct}%` }} />
+            <span className="pct">{pct}%</span>
+          </div>
+        </button>
+      );
+    }
+
+    function Keypad({ onDigit, onDelete, onEnter, disabled }) {
+      const keys = ['1','2','3','4','5','6','7','8','9'];
+      return (
+        <div className="keypad">
+          {keys.map(k => (
+            <button key={k} className="key" onClick={() => onDigit(k)} disabled={disabled}>{k}</button>
+          ))}
+          <button className="key del" onClick={onDelete} disabled={disabled}>⌫</button>
+          <button className="key" onClick={() => onDigit('0')} disabled={disabled}>0</button>
+          <button className="key enter" onClick={onEnter} disabled={disabled}>Enter</button>
+        </div>
+      );
+    }
+
+    // Map spoken number words → digits (answers are 0–144, but typically 1–12)
+    const WORD_TO_NUM = {
+      zero: 0, oh: 0, o: 0,
+      one: 1, two: 2, three: 3, four: 4, five: 5,
+      six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+      eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+      sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
+      thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70,
+      eighty: 80, ninety: 90,
+      hundred: 100,
+    };
+
+    function parseSpokenNumber(transcript) {
+      if (!transcript) return null;
+      const t = transcript.toLowerCase().trim().replace(/[.,!?]/g, '');
+      // Direct digits, e.g. "12" or "7"
+      const digitMatch = t.match(/\b(\d{1,3})\b/);
+      if (digitMatch) return parseInt(digitMatch[1], 10);
+
+      const words = t.split(/\s+/);
+      // Simple single word
+      if (words.length === 1 && WORD_TO_NUM[words[0]] !== undefined) {
+        return WORD_TO_NUM[words[0]];
+      }
+      // "twenty four", "thirty two", etc.
+      let total = 0;
+      let current = 0;
+      for (const w of words) {
+        if (WORD_TO_NUM[w] === undefined) continue;
+        const val = WORD_TO_NUM[w];
+        if (val === 100) {
+          current = (current || 1) * 100;
+        } else if (val >= 20) {
+          current += val;
+        } else {
+          current += val;
+        }
+      }
+      total += current;
+      if (total > 0 || words.some(w => w === 'zero' || w === 'oh')) return total;
+      return null;
+    }
+
+    const SpeechRecognitionAPI = typeof window !== 'undefined'
+      ? (window.SpeechRecognition || window.webkitSpeechRecognition)
+      : null;
+
+    function emptyProgress() {
+      const p = {};
+      for (let i = 1; i <= 12; i++) p[i] = { correct: 0, total: 0 };
+      return p;
+    }
+
+    function loadProgress() {
+      try {
+        const raw = localStorage.getItem('divFlashProgress');
+        if (!raw) return emptyProgress();
+        const parsed = JSON.parse(raw);
+        const p = emptyProgress();
+        for (let i = 1; i <= 12; i++) {
+          if (parsed[i] && typeof parsed[i].correct === 'number' && typeof parsed[i].total === 'number') {
+            p[i] = { correct: parsed[i].correct, total: parsed[i].total };
+          }
+        }
+        return p;
+      } catch (e) {
+        return emptyProgress();
+      }
+    }
+
+    function App() {
+      // progress[divisor] = { correct, total } per divisor (1-12)
+      const [progress, setProgress] = useState(loadProgress);
+
+      // Persist progress whenever it changes
+      useEffect(() => {
+        try {
+          localStorage.setItem('divFlashProgress', JSON.stringify(progress));
+        } catch (e) { /* ignore quota / private mode */ }
+      }, [progress]);
+
+      const [randomize, setRandomize] = useState(true);
+      const [doubleCards, setDoubleCards] = useState(false);
+
+      const [mode, setMode] = useState('home'); // home | practice | results
+      const [deck, setDeck] = useState([]);
+      const [index, setIndex] = useState(0);
+      const [input, setInput] = useState('');
+      const [feedback, setFeedback] = useState(null); // null | 'correct' | 'wrong'
+      const [sessionCorrect, setSessionCorrect] = useState(0);
+      const [sessionTotal, setSessionTotal] = useState(0);
+      const [activeLabel, setActiveLabel] = useState('');
+      const [locked, setLocked] = useState(false);
+      const [listening, setListening] = useState(false);
+      const [micHint, setMicHint] = useState('');
+      const [micError, setMicError] = useState(false);
+      const recognitionRef = React.useRef(null);
+      const speechSupported = !!SpeechRecognitionAPI;
+
+      // Clean up recognition on unmount or mode change
+      useEffect(() => {
+        return () => {
+          if (recognitionRef.current) {
+            try { recognitionRef.current.abort(); } catch (e) {}
+            recognitionRef.current = null;
+          }
+        };
+      }, []);
+
+      useEffect(() => {
+        if (mode !== 'practice' && recognitionRef.current) {
+          try { recognitionRef.current.abort(); } catch (e) {}
+          recognitionRef.current = null;
+          setListening(false);
+          setMicHint('');
+          setMicError(false);
+        }
+      }, [mode]);
+
+      // Auto-start a short demo set when ?demo=1 is in the URL (for testing)
+      useEffect(() => {
+        if (window.location.search.includes('demo=1') && mode === 'home' && deck.length === 0) {
+          const d = buildDeck([3], false, true);
+          setDeck(d);
+          setIndex(0);
+          setActiveLabel('÷3 (demo)');
+          setMode('practice');
+        }
+      }, []);
+
+      const calcPct = (obj) => {
+        if (!obj || obj.total === 0) return 0;
+        return Math.round((obj.correct / obj.total) * 100);
+      };
+
+      const individualPct = (n) => calcPct(progress[n]);
+
+      const groupPct = (nums) => {
+        let c = 0, t = 0;
+        nums.forEach(n => {
+          c += progress[n].correct;
+          t += progress[n].total;
+        });
+        return t === 0 ? 0 : Math.round((c / t) * 100);
+      };
+
+      const startPractice = (divisors, label) => {
+        if (recognitionRef.current) {
+          try { recognitionRef.current.abort(); } catch (e) {}
+          recognitionRef.current = null;
+        }
+        setListening(false);
+        setMicHint('');
+        setMicError(false);
+        const d = buildDeck(divisors, doubleCards, randomize);
+        setDeck(d);
+        setIndex(0);
+        setInput('');
+        setFeedback(null);
+        setSessionCorrect(0);
+        setSessionTotal(0);
+        setActiveLabel(label);
+        setLocked(false);
+        setMode('practice');
+      };
+
+      const [resetFlash, setResetFlash] = useState(false);
+
+      const resetAllProgress = () => {
+        const p = emptyProgress();
+        setProgress(p);
+        try {
+          localStorage.removeItem('divFlashProgress');
+          localStorage.setItem('divFlashProgress', JSON.stringify(p));
+        } catch (e) { /* ignore */ }
+        setResetFlash(true);
+        setTimeout(() => setResetFlash(false), 1500);
+      };
+
+      const current = deck[index];
+
+      const submitAnswer = useCallback(() => {
+        if (!current || locked || input === '') return;
+        // Stop any active listening when answering
+        if (recognitionRef.current) {
+          try { recognitionRef.current.abort(); } catch (e) {}
+          recognitionRef.current = null;
+        }
+        setListening(false);
+        setMicHint('');
+        setMicError(false);
+
+        setLocked(true);
+        const num = parseInt(input, 10);
+        const isCorrect = num === current.answer;
+        setFeedback(isCorrect ? 'correct' : 'wrong');
+        setSessionTotal(t => t + 1);
+        if (isCorrect) setSessionCorrect(c => c + 1);
+
+        // Update progress for the divisor being practiced (the 'b' side)
+        setProgress(prev => {
+          const next = { ...prev };
+          const d = current.b;
+          next[d] = {
+            correct: prev[d].correct + (isCorrect ? 1 : 0),
+            total: prev[d].total + 1,
+          };
+          return next;
+        });
+
+        setTimeout(() => {
+          setInput('');
+          setFeedback(null);
+          setLocked(false);
+          if (index + 1 >= deck.length) {
+            setMode('results');
+          } else {
+            setIndex(i => i + 1);
+          }
+        }, isCorrect ? 600 : 1100);
+      }, [current, input, locked, index, deck.length]);
+
+      const handleDigit = (d) => {
+        if (locked) return;
+        setInput(prev => {
+          if (prev.length >= 4) return prev;
+          return prev + d;
+        });
+      };
+
+      const handleDelete = () => {
+        if (locked) return;
+        setInput(prev => prev.slice(0, -1));
+      };
+
+      const stopListening = () => {
+        if (recognitionRef.current) {
+          try { recognitionRef.current.abort(); } catch (e) {}
+          recognitionRef.current = null;
+        }
+        setListening(false);
+      };
+
+      const startListening = () => {
+        if (!speechSupported || locked || listening) return;
+        setMicError(false);
+        setMicHint('Listening… say the number');
+        const recognition = new SpeechRecognitionAPI();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 5;
+        recognition.continuous = false;
+
+        recognition.onresult = (event) => {
+          let num = null;
+          for (let i = 0; i < event.results[0].length; i++) {
+            const transcript = event.results[0][i].transcript;
+            num = parseSpokenNumber(transcript);
+            if (num !== null) break;
+          }
+          if (num !== null && num >= 0 && num <= 999) {
+            setInput(String(num));
+            setMicHint(`Heard: ${num}`);
+            // Auto-submit after a short beat so the student sees the number
+            setTimeout(() => {
+              // Use a direct path: we can't call submitAnswer with stale closure easily,
+              // so set a flag via a tiny delay and rely on the latest submit via effect-free path.
+              // Instead, trigger submit by simulating the flow with the value we just set.
+            }, 0);
+          } else {
+            const heard = event.results[0][0] ? event.results[0][0].transcript : '';
+            setMicHint(heard ? `Couldn't understand "${heard}"` : "Couldn't understand — try again");
+            setMicError(true);
+          }
+          setListening(false);
+          recognitionRef.current = null;
+        };
+
+        recognition.onerror = (event) => {
+          setListening(false);
+          recognitionRef.current = null;
+          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            setMicHint('Microphone blocked — allow mic access');
+            setMicError(true);
+          } else if (event.error === 'no-speech') {
+            setMicHint('No speech detected — try again');
+            setMicError(true);
+          } else if (event.error !== 'aborted') {
+            setMicHint('Speech error — try again');
+            setMicError(true);
+          } else {
+            setMicHint('');
+            setMicError(false);
+          }
+        };
+
+        recognition.onend = () => {
+          setListening(false);
+          recognitionRef.current = null;
+        };
+
+        recognitionRef.current = recognition;
+        setListening(true);
+        try {
+          recognition.start();
+        } catch (e) {
+          setListening(false);
+          setMicHint('Could not start microphone');
+          setMicError(true);
+        }
+      };
+
+      const toggleListening = () => {
+        if (listening) stopListening();
+        else startListening();
+      };
+
+      // When input is set by speech and we want auto-submit: watch for micHint "Heard:"
+      const pendingSpeechSubmit = React.useRef(false);
+      useEffect(() => {
+        if (micHint.startsWith('Heard:') && input !== '' && !locked) {
+          pendingSpeechSubmit.current = true;
+          const t = setTimeout(() => {
+            if (pendingSpeechSubmit.current) {
+              pendingSpeechSubmit.current = false;
+              submitAnswer();
+            }
+          }, 450);
+          return () => clearTimeout(t);
+        }
+      }, [micHint, input, locked, submitAnswer]);
+
+      // Keyboard support
+      useEffect(() => {
+        if (mode !== 'practice') return;
+        const onKey = (e) => {
+          if (e.key >= '0' && e.key <= '9') handleDigit(e.key);
+          else if (e.key === 'Backspace') handleDelete();
+          else if (e.key === 'Enter') submitAnswer();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [mode, submitAnswer, locked, input]);
+
+      const goHome = () => {
+        setMode('home');
+        setDeck([]);
+        setIndex(0);
+        setInput('');
+        setFeedback(null);
+      };
+
+      if (mode === 'results') {
+        const pct = sessionTotal ? Math.round((sessionCorrect / sessionTotal) * 100) : 0;
+        return (
+          <div>
+            <h1>Division Flash Cards</h1>
+            <div className="section results">
+              <h2>Session Complete!</h2>
+              <p><strong>{activeLabel}</strong></p>
+              <p style={{ fontSize: '1.5rem', color: 'var(--text)', margin: '16px 0' }}>
+                {sessionCorrect} / {sessionTotal} correct
+              </p>
+              <p style={{ fontSize: '1.25rem', color: getProgressColor(pct) }}>{pct}%</p>
+              <div className="controls" style={{ marginTop: 24 }}>
+                <button className="btn btn-secondary" onClick={goHome}>Back to Menu</button>
+                <button className="btn btn-primary" onClick={() => startPractice(
+                  activeLabel === 'All (1-12)' ? [1,2,3,4,5,6,7,8,9,10,11,12] :
+                  activeLabel === '2-5' ? [2,3,4,5] :
+                  activeLabel === '6-8' ? [6,7,8] :
+                  activeLabel === '9-12' ? [9,10,11,12] :
+                  [parseInt(activeLabel.replace('÷',''), 10)],
+                  activeLabel
+                )}>Practice Again</button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      if (mode === 'practice' && current) {
+        return (
+          <div>
+            <h1>Division Flash Cards</h1>
+            <p className="subtitle">{activeLabel} · Card {index + 1} of {deck.length}</p>
+            <div className="card-view">
+              <div className="meta">
+                <span>Correct: <strong>{sessionCorrect}</strong></span>
+                <span>Remaining: <strong>{deck.length - index}</strong></span>
+              </div>
+              <div className="card">
+                {feedback && (
+                  <span className={`feedback ${feedback === 'correct' ? 'ok' : 'bad'}`}>
+                    {feedback === 'correct' ? '✓ Correct!' : `✗ ${current.answer}`}
+                  </span>
+                )}
+                <div className="problem">{current.a} ÷ {current.b}</div>
+                <div className={`answer-display ${feedback || ''}`}>
+                  {input || <span style={{ opacity: 0.3 }}>?</span>}
+                </div>
+              </div>
+              {speechSupported && (
+                <div className="mic-row">
+                  <button
+                    type="button"
+                    className={`mic-btn ${listening ? 'listening' : ''}`}
+                    onClick={toggleListening}
+                    disabled={locked}
+                    aria-label={listening ? 'Stop listening' : 'Say the answer'}
+                    title={listening ? 'Stop listening' : 'Say the answer'}
+                  >
+                    {listening ? '⏹' : '🎤'}
+                  </button>
+                  <div className={`mic-hint ${listening ? 'listening' : ''} ${micError ? 'error' : ''}`}>
+                    {micHint || (listening ? 'Listening… say the number' : 'Tap mic & say the number')}
+                  </div>
+                </div>
+              )}
+              <Keypad
+                onDigit={handleDigit}
+                onDelete={handleDelete}
+                onEnter={submitAnswer}
+                disabled={locked}
+              />
+              <div className="controls">
+                <button className="btn btn-secondary" onClick={goHome}>Quit</button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Home view
+      return (
+        <div>
+          <h1>Division Flash Cards</h1>
+          <p className="subtitle">Choose a set · Track your progress · Practice with keypad or voice</p>
+
+          <div className="section">
+            <div className="section-title">Individual (1–12)</div>
+            <div className="progress-grid">
+              {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
+                <ProgressButton
+                  key={n}
+                  label={`÷${n}`}
+                  pct={individualPct(n)}
+                  onClick={() => startPractice([n], `÷${n}`)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="section">
+            <div className="section-title">Groups</div>
+            <div className="group-row">
+              <ProgressButton
+                className="group-btn"
+                label="2–5"
+                pct={groupPct([2,3,4,5])}
+                onClick={() => startPractice([2,3,4,5], '2-5')}
+              />
+              <ProgressButton
+                className="group-btn"
+                label="6–8"
+                pct={groupPct([6,7,8])}
+                onClick={() => startPractice([6,7,8], '6-8')}
+              />
+              <ProgressButton
+                className="group-btn"
+                label="9–12"
+                pct={groupPct([9,10,11,12])}
+                onClick={() => startPractice([9,10,11,12], '9-12')}
+              />
+              <ProgressButton
+                className="group-btn"
+                label="All"
+                pct={groupPct([1,2,3,4,5,6,7,8,9,10,11,12])}
+                onClick={() => startPractice([1,2,3,4,5,6,7,8,9,10,11,12], 'All (1-12)')}
+              />
+            </div>
+          </div>
+
+          <div className="section">
+            <div className="section-title">Options</div>
+            <div className="options">
+              <label className="check-label">
+                <input
+                  type="checkbox"
+                  checked={randomize}
+                  onChange={e => setRandomize(e.target.checked)}
+                />
+                Randomize flash cards
+              </label>
+              <label className="check-label">
+                <input
+                  type="checkbox"
+                  checked={doubleCards}
+                  onChange={e => setDoubleCards(e.target.checked)}
+                />
+                Double the number of cards
+              </label>
+              <button
+                className="btn btn-danger"
+                onClick={resetAllProgress}
+                type="button"
+                style={resetFlash ? { background: '#22c55e', color: '#0f172a' } : undefined}
+              >
+                {resetFlash ? 'Progress reset!' : 'Reset all progress'}
+              </button>
+            </div>
+          </div>
+
+          <div className="section" style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>
+            Progress is tracked per divisor as you answer. Select any colored button above to start practicing that set.
+            <br />All problems have whole-number answers (no remainders).
+            <br />During practice, tap the 🎤 mic and say the answer (Chrome, Edge, Safari).
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
